@@ -1,6 +1,5 @@
-# ============================================
-# FORMA — RENDER BACKEND DEPLOYMENT
-# ============================================
+# Forma — Render API deployment
+# Repository: npm workspaces monorepo
 
 services:
   - type: web
@@ -9,44 +8,31 @@ services:
     runtime: node
     plan: free
 
-    # Keep the repository root as the working
-    # directory because Forma uses npm workspaces.
+    # Install build-time TypeScript dependencies,
+    # even when NODE_ENV=production.
+    buildCommand: npm ci --include=dev && npm run build -w @forma/api
 
-    # Install dependencies from the root lockfile
-    # and compile only the Express API.
-    buildCommand: npm ci && npm run build -w @forma/api
-
-    # Run the existing compiled API start script.
+    # Start the compiled Express application.
     startCommand: npm run start -w @forma/api
 
-    # Check real MongoDB connectivity.
     healthCheckPath: /api/health
-
-    # Deploy manually until verification passes.
-    autoDeployTrigger: "off"
+    autoDeployTrigger: off
 
     envVars:
-      # Production Node environment.
       - key: NODE_ENV
         value: production
 
-      # Render runs behind a reverse proxy.
       - key: TRUST_PROXY
         value: "1"
 
-      # MongoDB Atlas connection string.
       - key: MONGODB_URI
         sync: false
 
-      # Generate a secure session secret.
       - key: SESSION_SECRET
         generateValue: true
 
-      # Stripe test-mode secret key.
       - key: STRIPE_SECRET_KEY
         sync: false
 
-      # Secret from the deployed Stripe
-      # test-mode webhook destination.
       - key: STRIPE_WEBHOOK_SECRET
         sync: false
