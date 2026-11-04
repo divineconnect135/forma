@@ -1,0 +1,60 @@
+/* ========================================
+   FORMA — ACCESSIBILITY
+   ======================================== */
+
+/* Visible keyboard focus */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 3px solid #c2410c;
+  outline-offset: 3px;
+}
+
+/* Skip directly to main content */
+.forma-skip-link {
+  position: fixed;
+  top: 0;
+  left: 1rem;
+  z-index: 9999;
+
+  transform: translateY(-150%);
+
+  padding: 0.85rem 1.25rem;
+
+  background: #171717;
+  color: #ffffff;
+
+  border-radius: 0 0 0.75rem 0.75rem;
+
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.forma-skip-link:focus-visible {
+  transform: translateY(0);
+  outline-color: #ea580c;
+}
+
+/* Prevent focus targets from sitting directly
+   underneath fixed or sticky navigation. */
+:where(main, section, article, h1, h2, h3)[id] {
+  scroll-margin-top: 5rem;
+}
+
+/* ========================================
+   REDUCED MOTION
+   ======================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto !important;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

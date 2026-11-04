@@ -1,1 +1,19 @@
 node_modules
+
+# Environment files and credentials
+.env
+.env.*
+!.env.example
+
+# Dependencies
+node_modules/
+
+# Generated build files
+dist/
+coverage/
+
+# Logs
+*.log
+
+# macOS
+.DS_Store

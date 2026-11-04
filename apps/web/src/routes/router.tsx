@@ -1,164 +1,316 @@
-import { createBrowserRouter } from "react-router";
-
-import { SiteLayout } from "../layouts/SiteLayout";
-import { AdminLayout } from "../layouts/AdminLayout";
+import { createBrowserRouter, Outlet } from "react-router";
 
 import { ProtectedRoute } from "../components/ProtectedRoute";
+import { RouteErrorPage } from "../components/RouteErrorPage";
+import { SiteRoot } from "../components/SiteRoot";
 
-import { HomePage } from "../pages/HomePage";
-import { ProductsPage } from "../pages/ProductsPage";
-import { ProductDetailsPage } from "../pages/ProductDetailsPage";
+import "../styles/accessibility.css";
 
-import { LoginPage } from "../pages/LoginPage";
-import { RegisterPage } from "../pages/RegisterPage";
-import { AccountPage } from "../pages/AccountPage";
-
-import { CartPage } from "../pages/CartPage";
-import { CheckoutPage } from "../pages/CheckoutPage";
-import { CheckoutReturnPage } from "../pages/CheckoutReturnPage";
-
-import { OrdersPage } from "../pages/OrdersPage";
-import { OrderDetailsPage } from "../pages/OrderDetailsPage";
-
-import { AdminDashboardPage } from "../pages/AdminDashboardPage";
-
-import { AdminProductsPage } from "../pages/AdminProductsPage";
-
-import { AdminProductEditorPage } from "../pages/AdminProductEditorPage";
-
-import { AdminInventoryPage } from "../pages/AdminInventoryPage";
-
-import { AdminOrdersPage } from "../pages/AdminOrdersPage";
-
-import { AdminOrderDetailsPage } from "../pages/AdminOrderDetailsPage";
-
-import { AdminCustomersPage } from "../pages/AdminCustomersPage";
-
-import { AdminAuditPage } from "../pages/AdminAuditPage";
-
-import { NotFoundPage } from "../pages/NotFoundPage";
+function ProtectedPages() {
+  return (
+    <ProtectedRoute>
+      <Outlet />
+    </ProtectedRoute>
+  );
+}
 
 export const router = createBrowserRouter([
   {
-    element: <SiteLayout />,
+    Component: SiteRoot,
+    errorElement: <RouteErrorPage />,
 
     children: [
+      // ------------------------------------
+      // PUBLIC PAGES
+      // ------------------------------------
+
       {
         index: true,
-        element: <HomePage />,
-      },
-      {
-        path: "products",
-        element: <ProductsPage />,
-      },
-      {
-        path: "products/:slug",
-        element: <ProductDetailsPage />,
-      },
-      {
-        path: "login",
-        element: <LoginPage />,
-      },
-      {
-        path: "register",
-        element: <RegisterPage />,
-      },
-      {
-        path: "account",
-        element: (
-          <ProtectedRoute>
-            <AccountPage />
-          </ProtectedRoute>
-        ),
-      },
-      {
-        path: "cart",
-        element: <CartPage />,
-      },
-      {
-        path: "checkout",
-        element: (
-          <ProtectedRoute>
-            <CheckoutPage />
-          </ProtectedRoute>
-        ),
-      },
-      {
-        path: "checkout/success",
-        element: <CheckoutReturnPage outcome="success" />,
-      },
-      {
-        path: "checkout/cancel",
-        element: <CheckoutReturnPage outcome="cancel" />,
-      },
-      {
-        path: "orders",
-        element: (
-          <ProtectedRoute>
-            <OrdersPage />
-          </ProtectedRoute>
-        ),
-      },
-      {
-        path: "orders/:orderId",
-        element: (
-          <ProtectedRoute>
-            <OrderDetailsPage />
-          </ProtectedRoute>
-        ),
+        lazy: async () => {
+          const { HomePage } = await import("../pages/HomePage");
+
+          return { Component: HomePage };
+        },
       },
 
-      // All admin pages share the admin layout.
       {
-        path: "admin",
-        element: (
-          <ProtectedRoute>
-            <AdminLayout />
-          </ProtectedRoute>
-        ),
+        path: "products",
+        lazy: async () => {
+          const { ProductsPage } = await import("../pages/ProductsPage");
+
+          return { Component: ProductsPage };
+        },
+      },
+
+      {
+        path: "products/:slug",
+        lazy: async () => {
+          const { ProductDetailsPage } =
+            await import("../pages/ProductDetailsPage");
+
+          return {
+            Component: ProductDetailsPage,
+          };
+        },
+      },
+
+      {
+        path: "login",
+        lazy: async () => {
+          const { LoginPage } = await import("../pages/LoginPage");
+
+          return { Component: LoginPage };
+        },
+      },
+
+      {
+        path: "register",
+        lazy: async () => {
+          const { RegisterPage } = await import("../pages/RegisterPage");
+
+          return { Component: RegisterPage };
+        },
+      },
+
+      {
+        path: "cart",
+        lazy: async () => {
+          const { CartPage } = await import("../pages/CartPage");
+
+          return { Component: CartPage };
+        },
+      },
+
+      // ------------------------------------
+      // STRIPE RETURN PAGES
+      // ------------------------------------
+
+      {
+        path: "checkout/success",
+        lazy: async () => {
+          const { CheckoutReturnPage } =
+            await import("../pages/CheckoutReturnPage");
+
+          function CheckoutSuccessRoute() {
+            return <CheckoutReturnPage outcome="success" />;
+          }
+
+          return {
+            Component: CheckoutSuccessRoute,
+          };
+        },
+      },
+
+      {
+        path: "checkout/cancel",
+        lazy: async () => {
+          const { CheckoutReturnPage } =
+            await import("../pages/CheckoutReturnPage");
+
+          function CheckoutCancelRoute() {
+            return <CheckoutReturnPage outcome="cancel" />;
+          }
+
+          return {
+            Component: CheckoutCancelRoute,
+          };
+        },
+      },
+
+      // ------------------------------------
+      // AUTHENTICATED CUSTOMER PAGES
+      // ------------------------------------
+
+      {
+        Component: ProtectedPages,
+
         children: [
           {
-            index: true,
-            element: <AdminDashboardPage />,
+            path: "account",
+            lazy: async () => {
+              const { AccountPage } = await import("../pages/AccountPage");
+
+              return {
+                Component: AccountPage,
+              };
+            },
           },
+
           {
-            path: "products",
-            element: <AdminProductsPage />,
+            path: "checkout",
+            lazy: async () => {
+              const { CheckoutPage } = await import("../pages/CheckoutPage");
+
+              return {
+                Component: CheckoutPage,
+              };
+            },
           },
-          {
-            path: "products/new",
-            element: <AdminProductEditorPage />,
-          },
-          {
-            path: "products/:productId",
-            element: <AdminProductEditorPage />,
-          },
-          {
-            path: "inventory",
-            element: <AdminInventoryPage />,
-          },
+
           {
             path: "orders",
-            element: <AdminOrdersPage />,
+            lazy: async () => {
+              const { OrdersPage } = await import("../pages/OrdersPage");
+
+              return {
+                Component: OrdersPage,
+              };
+            },
           },
+
           {
             path: "orders/:orderId",
-            element: <AdminOrderDetailsPage />,
+            lazy: async () => {
+              const { OrderDetailsPage } =
+                await import("../pages/OrderDetailsPage");
+
+              return {
+                Component: OrderDetailsPage,
+              };
+            },
           },
+
+          // --------------------------------
+          // ADMINISTRATION
+          // --------------------------------
+
           {
-            path: "customers",
-            element: <AdminCustomersPage />,
-          },
-          {
-            path: "audit",
-            element: <AdminAuditPage />,
+            path: "admin",
+
+            lazy: async () => {
+              const { AdminLayout } = await import("../layouts/AdminLayout");
+
+              return {
+                Component: AdminLayout,
+              };
+            },
+
+            children: [
+              {
+                index: true,
+                lazy: async () => {
+                  const { AdminDashboardPage } =
+                    await import("../pages/AdminDashboardPage");
+
+                  return {
+                    Component: AdminDashboardPage,
+                  };
+                },
+              },
+
+              {
+                path: "products",
+                lazy: async () => {
+                  const { AdminProductsPage } =
+                    await import("../pages/AdminProductsPage");
+
+                  return {
+                    Component: AdminProductsPage,
+                  };
+                },
+              },
+
+              {
+                path: "products/new",
+                lazy: async () => {
+                  const { AdminProductEditorPage } =
+                    await import("../pages/AdminProductEditorPage");
+
+                  return {
+                    Component: AdminProductEditorPage,
+                  };
+                },
+              },
+
+              {
+                path: "products/:productId",
+                lazy: async () => {
+                  const { AdminProductEditorPage } =
+                    await import("../pages/AdminProductEditorPage");
+
+                  return {
+                    Component: AdminProductEditorPage,
+                  };
+                },
+              },
+
+              {
+                path: "inventory",
+                lazy: async () => {
+                  const { AdminInventoryPage } =
+                    await import("../pages/AdminInventoryPage");
+
+                  return {
+                    Component: AdminInventoryPage,
+                  };
+                },
+              },
+
+              {
+                path: "orders",
+                lazy: async () => {
+                  const { AdminOrdersPage } =
+                    await import("../pages/AdminOrdersPage");
+
+                  return {
+                    Component: AdminOrdersPage,
+                  };
+                },
+              },
+
+              {
+                path: "orders/:orderId",
+                lazy: async () => {
+                  const { AdminOrderDetailsPage } =
+                    await import("../pages/AdminOrderDetailsPage");
+
+                  return {
+                    Component: AdminOrderDetailsPage,
+                  };
+                },
+              },
+
+              {
+                path: "customers",
+                lazy: async () => {
+                  const { AdminCustomersPage } =
+                    await import("../pages/AdminCustomersPage");
+
+                  return {
+                    Component: AdminCustomersPage,
+                  };
+                },
+              },
+
+              {
+                path: "audit",
+                lazy: async () => {
+                  const { AdminAuditPage } =
+                    await import("../pages/AdminAuditPage");
+
+                  return {
+                    Component: AdminAuditPage,
+                  };
+                },
+              },
+            ],
           },
         ],
       },
 
+      // ------------------------------------
+      // NOT FOUND
+      // ------------------------------------
+
       {
         path: "*",
-        element: <NotFoundPage />,
+        lazy: async () => {
+          const { NotFoundPage } = await import("../pages/NotFoundPage");
+
+          return {
+            Component: NotFoundPage,
+          };
+        },
       },
     ],
   },
