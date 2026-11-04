@@ -12,6 +12,13 @@ import { createSessionMiddleware } from "./config/session.js";
 
 import { csrfProtection } from "./middleware/auth.js";
 
+import {
+  adminMutationLimiter,
+  checkoutCreationLimiter,
+  privateApiNoStore,
+  requestBodyErrorHandler,
+} from "./middleware/apiSecurity.js";
+
 import { authRouter } from "./routes/auth.routes.js";
 import { productsRouter } from "./routes/products.routes.js";
 import { cartRouter } from "./routes/cart.routes.js";
@@ -23,7 +30,9 @@ import { stripeWebhookHandler } from "./routes/stripeWebhook.routes.js";
 
 import { CartError } from "./services/cart.service.js";
 import { CheckoutError } from "./services/checkout.service.js";
+import { CheckoutRecoveryError } from "./services/checkoutRecovery.service.js";
 import { OrderError } from "./services/orders.service.js";
+import { AdminManagementError } from "./services/adminManagement.service.js";
 
 export const app = express();
 
@@ -33,10 +42,8 @@ if (process.env.TRUST_PROXY === "1") {
   app.set("trust proxy", 1);
 }
 
-// Security headers
 app.use(helmet());
 
-// Request logging
 app.use((req, res, next) => {
   const requestId = randomUUID();
   const startedAt = Date.now();
@@ -59,8 +66,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// Stripe must receive the original raw request body.
-// Do not place this route below express.json().
+// Stripe raw body must precede JSON middleware.
 app.post(
   "/api/webhooks/stripe",
   express.raw({
@@ -70,13 +76,19 @@ app.post(
   stripeWebhookHandler,
 );
 
-// Standard API middleware
 app.use(express.json({ limit: "100kb" }));
-app.use(createSessionMiddleware());
+app.use(requestBodyErrorHandler);
 
+app.use("/api/checkout/session", checkoutCreationLimiter);
+
+app.use("/api/checkout/resume", checkoutCreationLimiter);
+
+app.use("/api/admin", adminMutationLimiter);
+
+app.use(createSessionMiddleware());
+app.use("/api", privateApiNoStore);
 app.use("/api", csrfProtection);
 
-// Health checks
 app.get("/api/health/live", (_req, res) => {
   res.status(200).json({
     status: "ok",
@@ -92,17 +104,13 @@ app.get("/api/health", (_req, res) => {
   });
 });
 
-// Customer APIs
 app.use("/api/auth", authRouter);
 app.use("/api/products", productsRouter);
 app.use("/api/cart", cartRouter);
 app.use("/api/checkout", checkoutRouter);
 app.use("/api/orders", ordersRouter);
-
-// Admin-only APIs
 app.use("/api/admin", adminRouter);
 
-// API 404
 app.use("/api", (_req, res) => {
   res.status(404).json({
     error: {
@@ -112,38 +120,48 @@ app.use("/api", (_req, res) => {
   });
 });
 
-function isExpectedError(
-  error: unknown,
-): error is CartError | CheckoutError | OrderError {
-  if (
-    error instanceof CartError ||
-    error instanceof CheckoutError ||
-    error instanceof OrderError
-  ) {
-    return true;
-  }
+const expectedErrorNames = new Set([
+  "CartError",
+  "CheckoutError",
+  "CheckoutRecoveryError",
+  "OrderError",
+  "AdminManagementError",
+]);
 
-  if (!(error instanceof Error) || !("status" in error) || !("code" in error)) {
-    return false;
-  }
-
-  return (
-    ["CartError", "CheckoutError", "OrderError"].includes(error.name) &&
-    typeof error.status === "number" &&
-    error.status >= 400 &&
-    error.status < 600 &&
-    typeof error.code === "string"
-  );
-}
-
-// Centralized JSON error handling
 const errorHandler: ErrorRequestHandler = (error: unknown, req, res, next) => {
   if (res.headersSent) {
     next(error);
     return;
   }
 
-  if (isExpectedError(error)) {
+  if (
+    error instanceof Error &&
+    expectedErrorNames.has(error.name) &&
+    "status" in error &&
+    typeof error.status === "number" &&
+    error.status >= 400 &&
+    error.status < 600 &&
+    "code" in error &&
+    typeof error.code === "string"
+  ) {
+    res.status(error.status).json({
+      error: {
+        code: error.code,
+        message: error.message,
+      },
+    });
+    return;
+  }
+
+  // Preserve direct class handling, including
+  // errors raised from each existing service.
+  if (
+    error instanceof CartError ||
+    error instanceof CheckoutError ||
+    error instanceof CheckoutRecoveryError ||
+    error instanceof OrderError ||
+    error instanceof AdminManagementError
+  ) {
     res.status(error.status).json({
       error: {
         code: error.code,

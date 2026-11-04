@@ -1,6 +1,7 @@
 import { createBrowserRouter } from "react-router";
 
 import { SiteLayout } from "../layouts/SiteLayout";
+import { AdminLayout } from "../layouts/AdminLayout";
 
 import { ProtectedRoute } from "../components/ProtectedRoute";
 
@@ -21,6 +22,20 @@ import { OrderDetailsPage } from "../pages/OrderDetailsPage";
 
 import { AdminDashboardPage } from "../pages/AdminDashboardPage";
 
+import { AdminProductsPage } from "../pages/AdminProductsPage";
+
+import { AdminProductEditorPage } from "../pages/AdminProductEditorPage";
+
+import { AdminInventoryPage } from "../pages/AdminInventoryPage";
+
+import { AdminOrdersPage } from "../pages/AdminOrdersPage";
+
+import { AdminOrderDetailsPage } from "../pages/AdminOrderDetailsPage";
+
+import { AdminCustomersPage } from "../pages/AdminCustomersPage";
+
+import { AdminAuditPage } from "../pages/AdminAuditPage";
+
 import { NotFoundPage } from "../pages/NotFoundPage";
 
 export const router = createBrowserRouter([
@@ -32,27 +47,22 @@ export const router = createBrowserRouter([
         index: true,
         element: <HomePage />,
       },
-
       {
         path: "products",
         element: <ProductsPage />,
       },
-
       {
         path: "products/:slug",
         element: <ProductDetailsPage />,
       },
-
       {
         path: "login",
         element: <LoginPage />,
       },
-
       {
         path: "register",
         element: <RegisterPage />,
       },
-
       {
         path: "account",
         element: (
@@ -61,12 +71,10 @@ export const router = createBrowserRouter([
           </ProtectedRoute>
         ),
       },
-
       {
         path: "cart",
         element: <CartPage />,
       },
-
       {
         path: "checkout",
         element: (
@@ -75,17 +83,14 @@ export const router = createBrowserRouter([
           </ProtectedRoute>
         ),
       },
-
       {
         path: "checkout/success",
         element: <CheckoutReturnPage outcome="success" />,
       },
-
       {
         path: "checkout/cancel",
         element: <CheckoutReturnPage outcome="cancel" />,
       },
-
       {
         path: "orders",
         element: (
@@ -94,7 +99,6 @@ export const router = createBrowserRouter([
           </ProtectedRoute>
         ),
       },
-
       {
         path: "orders/:orderId",
         element: (
@@ -104,16 +108,52 @@ export const router = createBrowserRouter([
         ),
       },
 
-      // Admin role is checked in the dashboard for
-      // appropriate UI and again by the Express API
-      // for actual security enforcement.
+      // All admin pages share the admin layout.
       {
         path: "admin",
         element: (
           <ProtectedRoute>
-            <AdminDashboardPage />
+            <AdminLayout />
           </ProtectedRoute>
         ),
+        children: [
+          {
+            index: true,
+            element: <AdminDashboardPage />,
+          },
+          {
+            path: "products",
+            element: <AdminProductsPage />,
+          },
+          {
+            path: "products/new",
+            element: <AdminProductEditorPage />,
+          },
+          {
+            path: "products/:productId",
+            element: <AdminProductEditorPage />,
+          },
+          {
+            path: "inventory",
+            element: <AdminInventoryPage />,
+          },
+          {
+            path: "orders",
+            element: <AdminOrdersPage />,
+          },
+          {
+            path: "orders/:orderId",
+            element: <AdminOrderDetailsPage />,
+          },
+          {
+            path: "customers",
+            element: <AdminCustomersPage />,
+          },
+          {
+            path: "audit",
+            element: <AdminAuditPage />,
+          },
+        ],
       },
 
       {

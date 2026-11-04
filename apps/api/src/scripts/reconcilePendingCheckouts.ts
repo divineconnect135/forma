@@ -7,124 +7,95 @@ import { env } from "../config/env.js";
 import { Order } from "../models/Order.js";
 
 import {
-  expireStripeSession,
-  retrieveStripeSession,
-} from "../services/stripe.service.js";
-
-import { settleStripeSession } from "../services/orderSettlement.service.js";
+  recoverCheckoutOrder,
+  CheckoutRecoveryError,
+} from "../services/checkoutRecovery.service.js";
 
 const BATCH_SIZE = 50;
 
 async function reconcilePendingCheckouts() {
   if (env.NODE_ENV === "production") {
-    throw new Error("Use a production-controlled reconciliation job");
+    throw new Error(
+      "Production reconciliation requires a managed scheduler and monitoring.",
+    );
   }
 
   if (!process.env.STRIPE_SECRET_KEY?.startsWith("sk_test_")) {
-    throw new Error("Stripe test configuration is required");
+    throw new Error("Stripe test configuration is required.");
   }
 
   await connectDatabase(env.MONGODB_URI);
 
   try {
-    // Check all active pending orders, even when
-    // their reservation has not expired yet.
-    const pending = await Order.find({
+    const orders = await Order.find({
       status: "pending_payment",
       reservationStatus: "active",
     })
-      .sort({ createdAt: 1 })
-      .limit(BATCH_SIZE)
-      .lean();
+      .sort({
+        createdAt: 1,
+        _id: 1,
+      })
+      .limit(BATCH_SIZE);
 
-    console.log(`Found ${pending.length} pending orders to check.`);
+    console.log(`Found ${orders.length} pending orders to check.`);
 
-    const results = {
+    const summary = {
       paid: 0,
       expired: 0,
-      cancelled: 0,
-      stillPending: 0,
-      skipped: 0,
+      open: 0,
+      processing: 0,
+      needsReview: 0,
       failed: 0,
     };
 
-    for (const order of pending) {
-      const sessionId = order.stripeCheckoutSessionId;
-
-      console.log(`\nChecking order: ${order.orderNumber}`);
-
-      if (!sessionId) {
-        console.warn("No saved Stripe Session ID. Manual review required.");
-
-        results.skipped++;
-        continue;
-      }
+    for (const order of orders) {
+      console.log(`\nChecking ${order.orderNumber}`);
 
       try {
-        // Always retrieve the current status from Stripe.
-        let stripeSession = await retrieveStripeSession(sessionId);
+        const result = await recoverCheckoutOrder(order);
 
-        console.log("Stripe session:", stripeSession.status);
-
-        console.log("Stripe payment:", stripeSession.payment_status);
-
-        // Expire an open Stripe Session only when
-        // its Stripe expiration time has passed.
-        const expiredByTime = stripeSession.expires_at * 1000 <= Date.now();
-
-        if (stripeSession.status === "open" && expiredByTime) {
-          try {
-            stripeSession = await expireStripeSession(sessionId);
-          } catch {
-            // Session could have completed
-            // concurrently. Retrieve it again.
-            stripeSession = await retrieveStripeSession(sessionId);
-          }
-        }
-
-        // The settlement service validates the
-        // Stripe order identity, payment amount,
-        // currency, and inventory transaction.
-        const outcome = await settleStripeSession(
-          stripeSession,
-          "reconciliation",
-        );
-
-        console.log("Reconciliation result:", outcome);
-
-        switch (outcome) {
+        switch (result.data.state) {
           case "paid":
-            results.paid++;
+            summary.paid++;
             break;
 
           case "expired":
-            results.expired++;
+            summary.expired++;
             break;
 
-          case "cancelled":
-            results.cancelled++;
+          case "ready":
+            summary.open++;
             break;
 
           case "pending":
-            results.stillPending++;
-            break;
-
-          case "already-finalized":
-          case "ignored":
-            results.skipped++;
+            summary.processing++;
             break;
         }
-      } catch (error) {
-        console.error(`Failed to reconcile ${order.orderNumber}:`, error);
 
-        results.failed++;
+        console.log(`Result: ${result.data.state}`);
+      } catch (error) {
+        if (
+          error instanceof CheckoutRecoveryError &&
+          error.code === "CHECKOUT_REQUIRES_REVIEW"
+        ) {
+          console.warn(`Manual payment review required: ${order.orderNumber}`);
+          summary.needsReview++;
+          continue;
+        }
+
+        console.error(
+          `Unable to reconcile ${order.orderNumber}:`,
+          error instanceof Error ? error.message : "Unknown error",
+        );
+
+        summary.failed++;
       }
     }
 
     console.log("\nReconciliation summary:");
-    console.log(results);
+    console.log(summary);
 
-    if (results.failed > 0) {
+    if (summary.needsReview > 0 || summary.failed > 0) {
       process.exitCode = 1;
     }
   } finally {

@@ -15,13 +15,24 @@ export interface CheckoutPreview {
   };
 }
 
+export type CheckoutRecoveryState = "ready" | "paid" | "expired" | "pending";
+
 export interface CheckoutSessionResponse {
   data: {
     orderId: string;
     orderNumber: string;
-    checkoutUrl: string;
+    checkoutUrl: string | null;
     expiresAt: string;
+    state: CheckoutRecoveryState;
   };
+}
+
+export interface ActiveCheckoutResponse {
+  data: {
+    orderId: string;
+    orderNumber: string;
+    expiresAt: string | null;
+  } | null;
 }
 
 export type OrderStatus =
@@ -38,13 +49,15 @@ export interface CheckoutStatusResponse {
   };
 }
 
-export async function getCheckoutPreview(): Promise<CheckoutPreview> {
+export function getCheckoutPreview() {
   return apiRequest<CheckoutPreview>("/api/checkout/preview");
 }
 
-export async function createCheckoutSession(
-  idempotencyKey: string,
-): Promise<CheckoutSessionResponse> {
+export function getActiveCheckout() {
+  return apiRequest<ActiveCheckoutResponse>("/api/checkout/active");
+}
+
+export function createCheckoutSession(idempotencyKey: string) {
   return apiRequest<CheckoutSessionResponse>("/api/checkout/session", {
     method: "POST",
     body: JSON.stringify({
@@ -53,9 +66,14 @@ export async function createCheckoutSession(
   });
 }
 
-export async function getCheckoutStatus(
-  sessionId: string,
-): Promise<CheckoutStatusResponse> {
+export function resumeCheckoutSession() {
+  return apiRequest<CheckoutSessionResponse>("/api/checkout/resume", {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+}
+
+export function getCheckoutStatus(sessionId: string) {
   return apiRequest<CheckoutStatusResponse>(
     `/api/checkout/status/${encodeURIComponent(sessionId)}`,
   );

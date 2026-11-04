@@ -2,15 +2,19 @@ import { Router } from "express";
 import { Types } from "mongoose";
 
 import { requireAuth } from "../middleware/auth.js";
+import { Order } from "../models/Order.js";
 
 import {
   getCheckoutPreview,
   startCheckout,
 } from "../services/checkout.service.js";
 
-import { createCheckoutSchema } from "../validators/checkout.js";
+import {
+  getActiveCheckout,
+  resumeActiveCheckout,
+} from "../services/checkoutRecovery.service.js";
 
-import { Order } from "../models/Order.js";
+import { createCheckoutSchema } from "../validators/checkout.js";
 
 export const checkoutRouter = Router();
 
@@ -24,6 +28,24 @@ checkoutRouter.get("/preview", async (req, res) => {
   res.status(200).json(result);
 });
 
+// GET /api/checkout/active
+checkoutRouter.get("/active", async (req, res) => {
+  const result = await getActiveCheckout(req.session.userId!);
+
+  res.setHeader("Cache-Control", "no-store");
+  res.status(200).json(result);
+});
+
+// POST /api/checkout/resume
+// Uses the authenticated customer's saved order.
+// No order ID or payment amount comes from the client.
+checkoutRouter.post("/resume", async (req, res) => {
+  const result = await resumeActiveCheckout(req.session.userId!);
+
+  res.setHeader("Cache-Control", "no-store");
+  res.status(200).json(result);
+});
+
 // POST /api/checkout/session
 checkoutRouter.post("/session", async (req, res) => {
   const parsed = createCheckoutSchema.safeParse(req.body);
@@ -32,7 +54,7 @@ checkoutRouter.post("/session", async (req, res) => {
     res.status(400).json({
       error: {
         code: "VALIDATION_ERROR",
-        message: "Invalid checkout request",
+        message: "Invalid checkout request.",
       },
     });
     return;
@@ -48,15 +70,17 @@ checkoutRouter.post("/session", async (req, res) => {
 });
 
 // GET /api/checkout/status/:sessionId
-// Users may only access their own orders.
 checkoutRouter.get("/status/:sessionId", async (req, res) => {
   const sessionId = req.params.sessionId;
 
-  if (!sessionId || !/^cs_test_[A-Za-z0-9_]+$/.test(sessionId)) {
+  if (
+    typeof sessionId !== "string" ||
+    !/^cs_test_[A-Za-z0-9_]+$/.test(sessionId)
+  ) {
     res.status(400).json({
       error: {
         code: "INVALID_SESSION_ID",
-        message: "Invalid checkout session ID",
+        message: "Invalid checkout session ID.",
       },
     });
     return;
@@ -73,7 +97,7 @@ checkoutRouter.get("/status/:sessionId", async (req, res) => {
     res.status(404).json({
       error: {
         code: "ORDER_NOT_FOUND",
-        message: "Order not found",
+        message: "Order not found.",
       },
     });
     return;

@@ -1,5 +1,12 @@
 import { Schema, model } from "mongoose";
 
+export const fulfillmentStatuses = [
+  "unfulfilled",
+  "processing",
+  "shipped",
+  "delivered",
+] as const;
+
 const orderItemSchema = new Schema(
   {
     productId: {
@@ -73,8 +80,8 @@ const orderSchema = new Schema(
     currency: {
       type: String,
       enum: ["USD"],
-      default: "USD",
       required: true,
+      default: "USD",
     },
     subtotalCents: {
       type: Number,
@@ -98,22 +105,37 @@ const orderSchema = new Schema(
       required: true,
       min: 0,
     },
+
+    // Only verified payment processing changes this.
     status: {
       type: String,
       enum: ["pending_payment", "paid", "cancelled", "expired", "refunded"],
-      default: "pending_payment",
       required: true,
+      default: "pending_payment",
     },
     reservationStatus: {
       type: String,
       enum: ["none", "active", "released", "committed"],
-      default: "none",
       required: true,
+      default: "none",
     },
     reservationExpiresAt: {
       type: Date,
       default: null,
     },
+
+    // Separate from Stripe payment status.
+    fulfillmentStatus: {
+      type: String,
+      enum: fulfillmentStatuses,
+      required: true,
+      default: "unfulfilled",
+    },
+    fulfillmentUpdatedAt: {
+      type: Date,
+      default: null,
+    },
+
     stripeCheckoutSessionId: {
       type: String,
       default: undefined,
@@ -139,13 +161,8 @@ orderSchema.index({
   createdAt: -1,
 });
 
-// Repeating a checkout request with the same key
-// cannot create a second order.
 orderSchema.index({ userId: 1, idempotencyKey: 1 }, { unique: true });
 
-// Only one unfinished checkout per customer.
-// This prevents competing checkout attempts
-// from reserving the same cart more than once.
 orderSchema.index(
   { userId: 1 },
   {
