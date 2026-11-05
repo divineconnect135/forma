@@ -10,6 +10,16 @@ Forma combines a design-focused shopping experience with backend functionality f
 
 ---
 
+## Application Screenshots
+
+### Storefront
+
+![Forma Storefront](docs/screenshots/storefront.png)
+
+### Admin Dashboard
+
+![Forma Admin Dashboard](docs/screenshots/admin-dashboard.png)
+
 ## Features
 
 ### Storefront and Product Discovery
